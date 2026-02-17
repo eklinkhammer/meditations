@@ -225,21 +225,79 @@ describe('generation routes', () => {
 
       expect(res.statusCode).toBe(400);
     });
+
+    it('succeeds with valid scriptContent for user_provided scriptType', async () => {
+      const createdGen = {
+        ...VALID_GENERATION,
+        scriptType: 'user_provided',
+        scriptContent: 'Welcome to your meditation...',
+      };
+
+      mockTransaction.mockImplementation(createSuccessfulTxMock(createdGen));
+
+      const app = await buildApp();
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/generations',
+        payload: {
+          ...validBody,
+          scriptType: 'user_provided',
+          scriptContent: 'Welcome to your meditation...',
+        },
+      });
+
+      expect(res.statusCode).toBe(201);
+      expect(res.json().scriptType).toBe('user_provided');
+    });
+  });
+
+  describe('DB error during transaction', () => {
+    it('returns 500 for non-INSUFFICIENT_CREDITS transaction error', async () => {
+      mockTransaction.mockImplementation(async (fn: Function) => {
+        const tx = {
+          update: vi.fn().mockReturnValue({
+            set: vi.fn().mockReturnValue({
+              where: vi.fn().mockReturnValue({
+                returning: vi.fn().mockResolvedValue([{ creditsBalance: 95 }]),
+              }),
+            }),
+          }),
+          insert: vi.fn().mockReturnValue({
+            values: vi.fn().mockRejectedValue(new Error('DB connection lost')),
+          }),
+        };
+        return fn(tx);
+      });
+
+      const app = await buildApp();
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/generations',
+        payload: validBody,
+      });
+
+      expect(res.statusCode).toBe(500);
+      expect(res.json().error).toMatch(/internal server error/i);
+    });
   });
 
   describe('GET /api/generations', () => {
-    it('returns paginated list', async () => {
+    function setupListMock(results: unknown[] = [VALID_GENERATION]) {
       mockSelect.mockReturnValue({
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
             orderBy: vi.fn().mockReturnValue({
               limit: vi.fn().mockReturnValue({
-                offset: vi.fn().mockResolvedValue([VALID_GENERATION]),
+                offset: vi.fn().mockResolvedValue(results),
               }),
             }),
           }),
         }),
       });
+    }
+
+    it('returns paginated list', async () => {
+      setupListMock();
 
       const app = await buildApp();
       const res = await app.inject({ method: 'GET', url: '/api/generations' });
@@ -249,6 +307,48 @@ describe('generation routes', () => {
       expect(body.data).toHaveLength(1);
       expect(body.page).toBe(1);
       expect(body.limit).toBe(20);
+    });
+
+    it('clamps limit to max 50', async () => {
+      setupListMock([]);
+      const app = await buildApp();
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/generations?limit=100',
+      });
+
+      expect(res.json().limit).toBe(50);
+    });
+
+    it('clamps page to min 1', async () => {
+      setupListMock([]);
+      const app = await buildApp();
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/generations?page=0',
+      });
+
+      expect(res.json().page).toBe(1);
+    });
+
+    it('returns 500 on DB error', async () => {
+      mockSelect.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            orderBy: vi.fn().mockReturnValue({
+              limit: vi.fn().mockReturnValue({
+                offset: vi.fn().mockRejectedValue(new Error('DB failure')),
+              }),
+            }),
+          }),
+        }),
+      });
+
+      const app = await buildApp();
+      const res = await app.inject({ method: 'GET', url: '/api/generations' });
+
+      expect(res.statusCode).toBe(500);
+      expect(res.json().error).toMatch(/internal server error/i);
     });
   });
 
@@ -296,6 +396,25 @@ describe('generation routes', () => {
       });
 
       expect(res.statusCode).toBe(404);
+    });
+
+    it('returns 500 on DB error', async () => {
+      mockSelect.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockRejectedValue(new Error('DB failure')),
+          }),
+        }),
+      });
+
+      const app = await buildApp();
+      const res = await app.inject({
+        method: 'GET',
+        url: `/api/generations/${VALID_GENERATION.id}/progress`,
+      });
+
+      expect(res.statusCode).toBe(500);
+      expect(res.json().error).toMatch(/internal server error/i);
     });
   });
 });

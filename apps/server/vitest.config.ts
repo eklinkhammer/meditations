@@ -4,6 +4,11 @@ export default defineConfig({
   test: {
     globals: true,
     exclude: ['dist/**', 'node_modules/**'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'lcov'],
+      exclude: ['**/test-helpers/**', '**/dist/**', '**/node_modules/**'],
+    },
     env: {
       DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
       REDIS_URL: 'redis://localhost:6379',

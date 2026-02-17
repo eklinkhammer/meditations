@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import Fastify from 'fastify';
-import { VALID_USER, VALID_VIDEO } from '../../test-helpers/fixtures.js';
+import { VALID_USER, VALID_VIDEO, PRIVATE_VIDEO } from '../../test-helpers/fixtures.js';
 import type { AuthUser } from '../../middleware/auth.js';
 
 const mockSelect = vi.fn();
@@ -129,6 +129,72 @@ describe('video routes', () => {
 
       expect(res.json().page).toBe(1);
     });
+
+    it('passes search query through', async () => {
+      setupListMock([]);
+      const app = await buildApp();
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/videos?search=peaceful',
+      });
+
+      expect(res.statusCode).toBe(200);
+    });
+
+    it('passes tags filter through', async () => {
+      setupListMock([]);
+      const app = await buildApp();
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/videos?tags=meditation,nature',
+      });
+
+      expect(res.statusCode).toBe(200);
+    });
+
+    it('sorts by popular (viewCount desc)', async () => {
+      setupListMock([]);
+      const app = await buildApp();
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/videos?sortBy=popular',
+      });
+
+      expect(res.statusCode).toBe(200);
+    });
+
+    it('sorts by duration (asc)', async () => {
+      setupListMock([]);
+      const app = await buildApp();
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/videos?sortBy=duration',
+      });
+
+      expect(res.statusCode).toBe(200);
+    });
+
+    it('returns 500 on DB error', async () => {
+      mockSelect.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          innerJoin: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              orderBy: vi.fn().mockReturnValue({
+                limit: vi.fn().mockReturnValue({
+                  offset: vi.fn().mockRejectedValue(new Error('DB failure')),
+                }),
+              }),
+            }),
+          }),
+        }),
+      });
+
+      const app = await buildApp();
+      const res = await app.inject({ method: 'GET', url: '/api/videos' });
+
+      expect(res.statusCode).toBe(500);
+      expect(res.json().error).toMatch(/internal server error/i);
+    });
   });
 
   describe('GET /api/videos/:id', () => {
@@ -234,6 +300,74 @@ describe('video routes', () => {
       });
 
       expect(res.statusCode).toBe(404);
+    });
+
+    it('owner can view their own private video', async () => {
+      const privateVideo = {
+        ...PRIVATE_VIDEO,
+        user: { id: VALID_USER.id, displayName: VALID_USER.displayName },
+      };
+      setupGetMock(privateVideo);
+      mockUpdate.mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue(undefined),
+        }),
+      });
+
+      const app = await buildApp();
+      const res = await app.inject({
+        method: 'GET',
+        url: `/api/videos/${PRIVATE_VIDEO.id}`,
+        headers: { authorization: 'Bearer valid-token' },
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json().id).toBe(PRIVATE_VIDEO.id);
+    });
+
+    it('owner can view their own pending-moderation video', async () => {
+      const pendingVideo = {
+        ...VALID_VIDEO,
+        visibility: 'public',
+        moderationStatus: 'pending',
+        user: { id: VALID_USER.id, displayName: VALID_USER.displayName },
+      };
+      setupGetMock(pendingVideo);
+      mockUpdate.mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue(undefined),
+        }),
+      });
+
+      const app = await buildApp();
+      const res = await app.inject({
+        method: 'GET',
+        url: `/api/videos/${VALID_VIDEO.id}`,
+        headers: { authorization: 'Bearer valid-token' },
+      });
+
+      expect(res.statusCode).toBe(200);
+    });
+
+    it('returns 500 on DB error', async () => {
+      mockSelect.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          innerJoin: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockRejectedValue(new Error('DB failure')),
+            }),
+          }),
+        }),
+      });
+
+      const app = await buildApp();
+      const res = await app.inject({
+        method: 'GET',
+        url: `/api/videos/${VALID_VIDEO.id}`,
+      });
+
+      expect(res.statusCode).toBe(500);
+      expect(res.json().error).toMatch(/internal server error/i);
     });
   });
 

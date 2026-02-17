@@ -66,6 +66,24 @@ describe('credit routes', () => {
       expect(body.balance).toBe(VALID_USER.creditsBalance);
       expect(body.transactions).toHaveLength(1);
     });
+
+    it('returns 500 on DB error', async () => {
+      mockSelect.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            orderBy: vi.fn().mockReturnValue({
+              limit: vi.fn().mockRejectedValue(new Error('DB failure')),
+            }),
+          }),
+        }),
+      });
+
+      const app = await buildApp();
+      const res = await app.inject({ method: 'GET', url: '/api/credits' });
+
+      expect(res.statusCode).toBe(500);
+      expect(res.json().error).toMatch(/internal server error/i);
+    });
   });
 
   describe('GET /api/credits/packs', () => {
@@ -146,6 +164,22 @@ describe('credit routes', () => {
       });
 
       expect(res.statusCode).toBe(400);
+    });
+
+    it('returns 500 on DB error during purchase transaction', async () => {
+      mockTransaction.mockImplementation(async () => {
+        throw new Error('Transaction failed');
+      });
+
+      const app = await buildApp();
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/credits/purchase',
+        payload: { packIndex: 0, paymentMethodId: 'pm_123' },
+      });
+
+      expect(res.statusCode).toBe(500);
+      expect(res.json().error).toMatch(/internal server error/i);
     });
   });
 });

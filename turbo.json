@@ -9,6 +9,10 @@
       "cache": false,
       "outputs": []
     },
+    "test:coverage": {
+      "cache": false,
+      "outputs": ["coverage/**"]
+    },
     "dev": {
       "cache": false,
       "persistent": true

@@ -67,6 +67,22 @@ describe('user routes', () => {
       expect(body.id).toBe(VALID_USER.id);
       expect(body.email).toBe(VALID_USER.email);
     });
+
+    it('returns 500 on DB error', async () => {
+      mockSelect.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockRejectedValue(new Error('DB failure')),
+          }),
+        }),
+      });
+
+      const app = await buildApp();
+      const res = await app.inject({ method: 'GET', url: '/api/users' });
+
+      expect(res.statusCode).toBe(500);
+      expect(res.json().error).toMatch(/internal server error/i);
+    });
   });
 
   describe('PATCH /api/users', () => {
@@ -106,6 +122,51 @@ describe('user routes', () => {
       });
 
       expect(res.statusCode).toBe(400);
+    });
+
+    it('accepts empty body (partial schema)', async () => {
+      const updatedUser = {
+        ...VALID_USER,
+        createdAt: new Date('2024-01-01').toISOString(),
+        updatedAt: new Date('2024-01-02').toISOString(),
+      };
+
+      mockUpdate.mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([updatedUser]),
+          }),
+        }),
+      });
+
+      const app = await buildApp();
+      const res = await app.inject({
+        method: 'PATCH',
+        url: '/api/users',
+        payload: {},
+      });
+
+      expect(res.statusCode).toBe(200);
+    });
+
+    it('returns 500 on DB error', async () => {
+      mockUpdate.mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            returning: vi.fn().mockRejectedValue(new Error('DB failure')),
+          }),
+        }),
+      });
+
+      const app = await buildApp();
+      const res = await app.inject({
+        method: 'PATCH',
+        url: '/api/users',
+        payload: { displayName: 'New Name' },
+      });
+
+      expect(res.statusCode).toBe(500);
+      expect(res.json().error).toMatch(/internal server error/i);
     });
   });
 });

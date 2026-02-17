@@ -53,6 +53,30 @@ describe('media routes', () => {
       const res = await app.inject({ method: 'GET', url: '/api/media/ambient-sounds' });
       expect(res.statusCode).toBe(200);
     });
+
+    it('returns 200 with empty array when no sounds exist', async () => {
+      mockSelect.mockReturnValue({
+        from: vi.fn().mockResolvedValue([]),
+      });
+
+      const app = await buildApp();
+      const res = await app.inject({ method: 'GET', url: '/api/media/ambient-sounds' });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json().data).toHaveLength(0);
+    });
+
+    it('returns 500 on DB error', async () => {
+      mockSelect.mockReturnValue({
+        from: vi.fn().mockRejectedValue(new Error('DB failure')),
+      });
+
+      const app = await buildApp();
+      const res = await app.inject({ method: 'GET', url: '/api/media/ambient-sounds' });
+
+      expect(res.statusCode).toBe(500);
+      expect(res.json().error).toMatch(/internal server error/i);
+    });
   });
 
   describe('GET /api/media/music-tracks', () => {
@@ -71,6 +95,30 @@ describe('media routes', () => {
       expect(res.statusCode).toBe(200);
       expect(res.json().data).toHaveLength(1);
     });
+
+    it('returns 200 with empty array when no tracks exist', async () => {
+      mockSelect.mockReturnValue({
+        from: vi.fn().mockResolvedValue([]),
+      });
+
+      const app = await buildApp();
+      const res = await app.inject({ method: 'GET', url: '/api/media/music-tracks' });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json().data).toHaveLength(0);
+    });
+
+    it('returns 500 on DB error', async () => {
+      mockSelect.mockReturnValue({
+        from: vi.fn().mockRejectedValue(new Error('DB failure')),
+      });
+
+      const app = await buildApp();
+      const res = await app.inject({ method: 'GET', url: '/api/media/music-tracks' });
+
+      expect(res.statusCode).toBe(500);
+      expect(res.json().error).toMatch(/internal server error/i);
+    });
   });
 
   describe('GET /api/media/script-templates', () => {
@@ -88,6 +136,30 @@ describe('media routes', () => {
 
       expect(res.statusCode).toBe(200);
       expect(res.json().data).toHaveLength(1);
+    });
+
+    it('returns 200 with empty array when no templates exist', async () => {
+      mockSelect.mockReturnValue({
+        from: vi.fn().mockResolvedValue([]),
+      });
+
+      const app = await buildApp();
+      const res = await app.inject({ method: 'GET', url: '/api/media/script-templates' });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json().data).toHaveLength(0);
+    });
+
+    it('returns 500 on DB error', async () => {
+      mockSelect.mockReturnValue({
+        from: vi.fn().mockRejectedValue(new Error('DB failure')),
+      });
+
+      const app = await buildApp();
+      const res = await app.inject({ method: 'GET', url: '/api/media/script-templates' });
+
+      expect(res.statusCode).toBe(500);
+      expect(res.json().error).toMatch(/internal server error/i);
     });
   });
 });

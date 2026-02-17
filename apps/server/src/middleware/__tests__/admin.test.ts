@@ -45,4 +45,16 @@ describe('requireAdmin middleware', () => {
     expect(res.statusCode).toBe(403);
     expect(res.json().error).toMatch(/admin/i);
   });
+
+  it('returns 401 when request.user is not set', async () => {
+    const app = Fastify();
+    // No onRequest hook to set request.user
+    app.get('/admin-test', { onRequest: [requireAdmin] }, async () => {
+      return { ok: true };
+    });
+
+    const res = await app.inject({ method: 'GET', url: '/admin-test' });
+    expect(res.statusCode).toBe(401);
+    expect(res.json().error).toMatch(/authentication required/i);
+  });
 });
