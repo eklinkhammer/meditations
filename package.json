@@ -5,6 +5,7 @@
     "dev": "turbo dev",
     "build": "turbo build",
     "lint": "turbo lint",
+    "test": "turbo test",
     "clean": "turbo clean",
     "db:generate": "turbo db:generate --filter=@meditations/server",
     "db:migrate": "turbo db:migrate --filter=@meditations/server",
@@ -12,7 +13,8 @@
   },
   "devDependencies": {
     "turbo": "^2.4.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^4.0.18"
   },
   "packageManager": "pnpm@9.15.0",
   "engines": {
