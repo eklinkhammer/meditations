@@ -26,7 +26,7 @@ export const createGenerationRequestSchema = z
     visualPrompt: z.string().min(1).max(1000),
     scriptType: z.enum(scriptTypeValues),
     scriptContent: z.string().optional(),
-    durationSeconds: z.enum(['60', '120', '180', '300']).transform(Number).or(z.literal(60)).or(z.literal(120)).or(z.literal(180)).or(z.literal(300)),
+    durationSeconds: z.union([z.literal(60), z.literal(120), z.literal(180), z.literal(300)]),
     ambientSoundId: z.string().uuid().optional(),
     musicTrackId: z.string().uuid().optional(),
     visibility: z

@@ -51,7 +51,6 @@ export const videoListItemSchema = videoSchema
 
 export const videoFilterSchema = z.object({
   search: z.string().optional(),
-  visibility: z.enum(videoVisibilityValues).optional(),
   tags: z.array(z.string()).optional(),
   sortBy: z.enum(['recent', 'popular', 'duration']).optional(),
   page: z.number().int().min(1).default(1).optional(),

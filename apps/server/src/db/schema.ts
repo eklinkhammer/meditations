@@ -51,6 +51,7 @@ export const creditTransactions = pgTable(
   },
   (table) => [
     index('credit_transactions_user_id_idx').on(table.userId),
+    index('credit_transactions_type_idx').on(table.type),
   ],
 );
 
@@ -128,12 +129,13 @@ export const generationRequests = pgTable(
     creditsCharged: integer('credits_charged').notNull().default(0),
     progress: integer('progress').notNull().default(0),
     videoId: uuid('video_id').references(() => videos.id),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     index('generation_requests_user_id_idx').on(table.userId),
     index('generation_requests_status_idx').on(table.status),
+    index('generation_requests_video_id_idx').on(table.videoId),
   ],
 );
 
@@ -146,7 +148,7 @@ export const scriptTemplates = pgTable('script_templates', {
   category: varchar('category', { length: 50 }).notNull(),
   scriptText: text('script_text').notNull(),
   durationHint: integer('duration_hint').notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
 // ---------------------------------------------------------------------------
@@ -156,7 +158,7 @@ export const pricingConfig = pgTable('pricing_config', {
   id: uuid('id').primaryKey().defaultRandom(),
   key: varchar('key', { length: 100 }).notNull().unique(),
   value: jsonb('value').notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
 // ---------------------------------------------------------------------------
@@ -169,9 +171,9 @@ export const pushTokens = pgTable(
     userId: uuid('user_id')
       .notNull()
       .references(() => users.id),
-    token: varchar('token', { length: 500 }).notNull(),
+    token: varchar('token', { length: 500 }).notNull().unique(),
     platform: varchar('platform', { length: 20 }).notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     index('push_tokens_user_id_idx').on(table.userId),

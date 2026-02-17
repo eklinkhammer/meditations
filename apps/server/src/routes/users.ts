@@ -9,23 +9,28 @@ export const userRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook('onRequest', authenticate);
 
   // GET / - Get current user profile
-  fastify.get('/', async (request) => {
-    const [user] = await db
-      .select({
-        id: users.id,
-        email: users.email,
-        displayName: users.displayName,
-        role: users.role,
-        creditsBalance: users.creditsBalance,
-        isPremium: users.isPremium,
-        createdAt: users.createdAt,
-        updatedAt: users.updatedAt,
-      })
-      .from(users)
-      .where(eq(users.id, request.user.id))
-      .limit(1);
+  fastify.get('/', async (request, reply) => {
+    try {
+      const [user] = await db
+        .select({
+          id: users.id,
+          email: users.email,
+          displayName: users.displayName,
+          role: users.role,
+          creditsBalance: users.creditsBalance,
+          isPremium: users.isPremium,
+          createdAt: users.createdAt,
+          updatedAt: users.updatedAt,
+        })
+        .from(users)
+        .where(eq(users.id, request.user.id))
+        .limit(1);
 
-    return user;
+      return user;
+    } catch (err) {
+      request.log.error(err, 'Failed to get user profile');
+      return reply.status(500).send({ error: 'Internal server error' });
+    }
   });
 
   // PATCH / - Update current user profile
@@ -35,21 +40,26 @@ export const userRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(400).send({ error: parsed.error.flatten() });
     }
 
-    const [updated] = await db
-      .update(users)
-      .set({ ...parsed.data, updatedAt: new Date() })
-      .where(eq(users.id, request.user.id))
-      .returning({
-        id: users.id,
-        email: users.email,
-        displayName: users.displayName,
-        role: users.role,
-        creditsBalance: users.creditsBalance,
-        isPremium: users.isPremium,
-        createdAt: users.createdAt,
-        updatedAt: users.updatedAt,
-      });
+    try {
+      const [updated] = await db
+        .update(users)
+        .set({ ...parsed.data, updatedAt: new Date() })
+        .where(eq(users.id, request.user.id))
+        .returning({
+          id: users.id,
+          email: users.email,
+          displayName: users.displayName,
+          role: users.role,
+          creditsBalance: users.creditsBalance,
+          isPremium: users.isPremium,
+          createdAt: users.createdAt,
+          updatedAt: users.updatedAt,
+        });
 
-    return updated;
+      return updated;
+    } catch (err) {
+      request.log.error(err, 'Failed to update user profile');
+      return reply.status(500).send({ error: 'Internal server error' });
+    }
   });
 };

@@ -1,7 +1,9 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import { config } from './config.js';
+import { sql } from './db/index.js';
 import { healthRoutes } from './routes/health.js';
 import { userRoutes } from './routes/users.js';
 import { videoRoutes } from './routes/videos.js';
@@ -16,8 +18,10 @@ const app = Fastify({
   },
 });
 
+await app.register(helmet);
+
 await app.register(cors, {
-  origin: '*',
+  origin: config.corsOrigins,
 });
 
 await app.register(rateLimit, {
@@ -38,6 +42,7 @@ await app.register(mediaRoutes, { prefix: '/api/media' });
 const shutdown = async () => {
   app.log.info('Shutting down gracefully...');
   await app.close();
+  await sql.end();
   process.exit(0);
 };
 

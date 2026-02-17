@@ -15,17 +15,12 @@ import type {
   PricingConfig,
   UpdatePricingConfig,
   ModerationAction,
+  PaginatedResponse,
 } from '@meditations/shared';
 
 export interface ApiClientConfig {
   baseUrl: string;
   getToken: () => Promise<string | null>;
-}
-
-interface PaginatedResponse<T> {
-  data: T[];
-  page: number;
-  limit: number;
 }
 
 class ApiError extends Error {

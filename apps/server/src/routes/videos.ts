@@ -6,7 +6,7 @@ import { db, videos, users } from '../db/index.js';
 
 export const videoRoutes: FastifyPluginAsync = async (fastify) => {
   // GET / - Browse public video library (no auth required)
-  fastify.get('/', async (request) => {
+  fastify.get('/', async (request, reply) => {
     const query = request.query as {
       search?: string;
       tags?: string;
@@ -15,8 +15,8 @@ export const videoRoutes: FastifyPluginAsync = async (fastify) => {
       limit?: string;
     };
 
-    const page = Math.max(1, parseInt(query.page || '1', 10));
-    const limit = Math.min(50, Math.max(1, parseInt(query.limit || '20', 10)));
+    const page = Math.max(1, parseInt(query.page || '1', 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(query.limit || '20', 10) || 20));
     const offset = (page - 1) * limit;
 
     const conditions = [
@@ -45,95 +45,125 @@ export const videoRoutes: FastifyPluginAsync = async (fastify) => {
         orderBy = desc(videos.createdAt);
     }
 
-    const results = await db
-      .select({
-        id: videos.id,
-        title: videos.title,
-        thumbnailKey: videos.thumbnailKey,
-        durationSeconds: videos.durationSeconds,
-        visibility: videos.visibility,
-        viewCount: videos.viewCount,
-        likeCount: videos.likeCount,
-        createdAt: videos.createdAt,
-        user: {
-          id: users.id,
-          displayName: users.displayName,
-        },
-      })
-      .from(videos)
-      .innerJoin(users, eq(videos.userId, users.id))
-      .where(and(...conditions))
-      .orderBy(orderBy)
-      .limit(limit)
-      .offset(offset);
+    try {
+      const results = await db
+        .select({
+          id: videos.id,
+          title: videos.title,
+          thumbnailKey: videos.thumbnailKey,
+          durationSeconds: videos.durationSeconds,
+          visibility: videos.visibility,
+          viewCount: videos.viewCount,
+          likeCount: videos.likeCount,
+          createdAt: videos.createdAt,
+          user: {
+            id: users.id,
+            displayName: users.displayName,
+          },
+        })
+        .from(videos)
+        .innerJoin(users, eq(videos.userId, users.id))
+        .where(and(...conditions))
+        .orderBy(orderBy)
+        .limit(limit)
+        .offset(offset);
 
-    return { data: results, page, limit };
+      return { data: results, page, limit };
+    } catch (err) {
+      request.log.error(err, 'Failed to list videos');
+      return reply.status(500).send({ error: 'Internal server error' });
+    }
   });
 
   // GET /my - Get current user's videos (requires auth)
-  fastify.get('/my', { onRequest: [authenticate] }, async (request) => {
+  fastify.get('/my', { onRequest: [authenticate] }, async (request, reply) => {
     const query = request.query as { page?: string; limit?: string };
-    const page = Math.max(1, parseInt(query.page || '1', 10));
-    const limit = Math.min(50, Math.max(1, parseInt(query.limit || '20', 10)));
+    const page = Math.max(1, parseInt(query.page || '1', 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(query.limit || '20', 10) || 20));
     const offset = (page - 1) * limit;
 
-    const results = await db
-      .select()
-      .from(videos)
-      .where(eq(videos.userId, request.user.id))
-      .orderBy(desc(videos.createdAt))
-      .limit(limit)
-      .offset(offset);
+    try {
+      const results = await db
+        .select()
+        .from(videos)
+        .where(eq(videos.userId, request.user.id))
+        .orderBy(desc(videos.createdAt))
+        .limit(limit)
+        .offset(offset);
 
-    return { data: results, page, limit };
+      return { data: results, page, limit };
+    } catch (err) {
+      request.log.error(err, 'Failed to list user videos');
+      return reply.status(500).send({ error: 'Internal server error' });
+    }
   });
 
   // GET /:id - Get single video
   fastify.get<{ Params: { id: string } }>('/:id', async (request, reply) => {
-    const [video] = await db
-      .select({
-        id: videos.id,
-        userId: videos.userId,
-        title: videos.title,
-        storageKey: videos.storageKey,
-        thumbnailKey: videos.thumbnailKey,
-        durationSeconds: videos.durationSeconds,
-        visibility: videos.visibility,
-        moderationStatus: videos.moderationStatus,
-        visualPrompt: videos.visualPrompt,
-        tags: videos.tags,
-        viewCount: videos.viewCount,
-        likeCount: videos.likeCount,
-        createdAt: videos.createdAt,
-        updatedAt: videos.updatedAt,
-        user: {
-          id: users.id,
-          displayName: users.displayName,
-        },
-      })
-      .from(videos)
-      .innerJoin(users, eq(videos.userId, users.id))
-      .where(eq(videos.id, request.params.id))
-      .limit(1);
-
-    if (!video) {
-      return reply.status(404).send({ error: 'Video not found' });
+    // Optionally authenticate to check ownership
+    let userId: string | undefined;
+    try {
+      const authHeader = request.headers.authorization;
+      if (authHeader?.startsWith('Bearer ')) {
+        await authenticate(request, reply);
+        userId = request.user?.id;
+      }
+    } catch {
+      // Auth is optional for this endpoint
     }
 
-    // Non-public videos are hidden unless viewer is the owner
-    if (
-      video.visibility !== VIDEO_VISIBILITY.PUBLIC ||
-      video.moderationStatus !== MODERATION_STATUS.APPROVED
-    ) {
-      return reply.status(404).send({ error: 'Video not found' });
+    try {
+      const [video] = await db
+        .select({
+          id: videos.id,
+          userId: videos.userId,
+          title: videos.title,
+          storageKey: videos.storageKey,
+          thumbnailKey: videos.thumbnailKey,
+          durationSeconds: videos.durationSeconds,
+          visibility: videos.visibility,
+          moderationStatus: videos.moderationStatus,
+          visualPrompt: videos.visualPrompt,
+          tags: videos.tags,
+          viewCount: videos.viewCount,
+          likeCount: videos.likeCount,
+          createdAt: videos.createdAt,
+          updatedAt: videos.updatedAt,
+          user: {
+            id: users.id,
+            displayName: users.displayName,
+          },
+        })
+        .from(videos)
+        .innerJoin(users, eq(videos.userId, users.id))
+        .where(eq(videos.id, request.params.id))
+        .limit(1);
+
+      if (!video) {
+        return reply.status(404).send({ error: 'Video not found' });
+      }
+
+      // Allow owner to view their own videos regardless of visibility/moderation
+      const isOwner = userId === video.userId;
+
+      if (
+        !isOwner &&
+        (video.visibility !== VIDEO_VISIBILITY.PUBLIC ||
+          video.moderationStatus !== MODERATION_STATUS.APPROVED)
+      ) {
+        return reply.status(404).send({ error: 'Video not found' });
+      }
+
+      // Increment view count
+      await db
+        .update(videos)
+        .set({ viewCount: sql`${videos.viewCount} + 1` })
+        .where(eq(videos.id, video.id));
+
+      return video;
+    } catch (err) {
+      request.log.error(err, 'Failed to get video');
+      return reply.status(500).send({ error: 'Internal server error' });
     }
-
-    // Increment view count
-    await db
-      .update(videos)
-      .set({ viewCount: sql`${videos.viewCount} + 1` })
-      .where(eq(videos.id, video.id));
-
-    return video;
   });
 };
