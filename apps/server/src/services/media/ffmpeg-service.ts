@@ -64,9 +64,6 @@ export async function compose(input: CompositionInput): Promise<CompositionOutpu
   // Probe voiceover to determine target duration
   const voiceProbe = await probe(voiceFile);
   const durationSeconds = Math.ceil(voiceProbe.format.duration ?? 0);
-  if (durationSeconds < 1) {
-    throw new Error('Invalid voiceover duration');
-  }
 
   // Build FFmpeg command
   const cmd = ffmpeg();

@@ -30,8 +30,3 @@ export function setAIProviders(overrides: Partial<AIProviders>): void {
   const current = providers ?? getAIProviders();
   providers = { ...current, ...overrides };
 }
-
-/** Reset providers to null for test isolation */
-export function resetAIProviders(): void {
-  providers = null;
-}

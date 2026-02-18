@@ -40,9 +40,6 @@ export async function download(key: string): Promise<Readable> {
   const res = await s3.send(
     new GetObjectCommand({ Bucket: bucket, Key: key }),
   );
-  if (!res.Body) {
-    throw new Error(`S3 object not found: ${key}`);
-  }
   return res.Body as Readable;
 }
 

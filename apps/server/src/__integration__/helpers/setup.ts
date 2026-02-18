@@ -5,14 +5,21 @@
  * (vi.mock is hoisted). This module exports the mock functions and helpers
  * that those vi.mock() calls should reference.
  */
-import { vi, type Mock } from 'vitest';
+import { vi } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { VALID_USER, ADMIN_USER } from '../../test-helpers/fixtures.js';
 
 // ---------------------------------------------------------------------------
 // Hoisted mock functions — import these in vi.hoisted() blocks
 // ---------------------------------------------------------------------------
-export function createHoistedMocks(): Record<string, Mock> {
+export function createHoistedMocks(): {
+  mockGetUser: import('vitest').Mock;
+  mockDbSelect: import('vitest').Mock;
+  mockDbUpdate: import('vitest').Mock;
+  mockDbInsert: import('vitest').Mock;
+  mockDbTransaction: import('vitest').Mock;
+  mockSql: import('vitest').Mock;
+} {
   return {
     mockGetUser: vi.fn(),
     mockDbSelect: vi.fn(),
@@ -115,7 +122,8 @@ export const mockTables = {
 // ---------------------------------------------------------------------------
 // DB mock factory — returns the object to use as vi.mock return value
 // ---------------------------------------------------------------------------
-export function createDbMockFactory(mocks: Record<string, Mock>): Record<string, unknown> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function createDbMockFactory(mocks: ReturnType<typeof createHoistedMocks>): any {
   return {
     db: {
       select: (...args: unknown[]) => mocks.mockDbSelect(...args),
@@ -170,7 +178,8 @@ export async function createTestApp(): Promise<FastifyInstance> {
 // ---------------------------------------------------------------------------
 // Chainable select mock — handles any chain order, resolves to `data`
 // ---------------------------------------------------------------------------
-export function chainableSelectMock(data: unknown[] = []): Mock {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function chainableSelectMock(data: unknown[] = []): any {
   const chain: Record<string, unknown> = {};
   const self = vi.fn().mockReturnValue(chain);
   const methods = ['from', 'where', 'innerJoin', 'orderBy', 'limit', 'offset', 'leftJoin'];

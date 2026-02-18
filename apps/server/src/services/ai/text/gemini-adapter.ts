@@ -49,13 +49,10 @@ export class GeminiScriptAdapter implements ScriptProvider {
       .join('\n');
 
     const res = await fetch(
-      `${GEMINI_BASE}/models/${MODEL}:generateContent`,
+      `${GEMINI_BASE}/models/${MODEL}:generateContent?key=${this.apiKey}`,
       {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': this.apiKey,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           system_instruction: { parts: [{ text: systemPrompt }] },
           contents: [
@@ -69,7 +66,6 @@ export class GeminiScriptAdapter implements ScriptProvider {
             maxOutputTokens: 2048,
           },
         }),
-        signal: AbortSignal.timeout(30_000),
       },
     );
 

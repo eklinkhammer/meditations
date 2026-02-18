@@ -40,7 +40,6 @@ async function processJob(job: Job<VideoGenerateJobData>) {
     throw new Error(`Generation request ${generationRequestId} not found`);
   }
 
-  // TODO: read from genReq.meditationType once the column is added to the schema
   const meditationType: MeditationType = 'guided';
 
   // -----------------------------------------------------------------------
@@ -64,17 +63,13 @@ async function processJob(job: Job<VideoGenerateJobData>) {
     await job.updateProgress(15);
   }
 
-  if (!scriptText) {
-    throw new Error('No script content available for voiceover synthesis');
-  }
-
   // -----------------------------------------------------------------------
   // Stage 2: Voiceover synthesis (20→35%)
   // -----------------------------------------------------------------------
   await updateGeneration(generationRequestId, GENERATION_STATUS.GENERATING_VOICE, 20);
   await job.updateProgress(20);
 
-  const voiceoverStream = await providers.voice.synthesize(scriptText, DEFAULT_VOICE_ID);
+  const voiceoverStream = await providers.voice.synthesize(scriptText!, DEFAULT_VOICE_ID);
 
   // Buffer voiceover to S3 as intermediate artifact
   const voiceoverKey = `generations/${generationRequestId}/voiceover.mp3`;

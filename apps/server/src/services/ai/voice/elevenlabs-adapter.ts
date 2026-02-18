@@ -33,7 +33,6 @@ export class ElevenLabsVoiceAdapter implements VoiceProvider {
             speed: 0.9,
           },
         }),
-        signal: AbortSignal.timeout(30_000),
       },
     );
 
@@ -48,7 +47,6 @@ export class ElevenLabsVoiceAdapter implements VoiceProvider {
   async listVoices(): Promise<Voice[]> {
     const res = await fetch(`${ELEVENLABS_BASE}/voices`, {
       headers: { 'xi-api-key': this.apiKey },
-      signal: AbortSignal.timeout(30_000),
     });
 
     if (!res.ok) {

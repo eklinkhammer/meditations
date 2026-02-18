@@ -86,13 +86,6 @@ export const generationRoutes: FastifyPluginAsync = async (fastify) => {
 
         return genRequest;
       });
-      // Enqueue the job before responding. If this fails, the catch block
-      // marks the generation as FAILED and returns 500.
-      await videoGenerateQueue.add(
-        'generate',
-        { generationRequestId: result.id },
-        { jobId: result.id },
-      );
     } catch (err) {
       if (err instanceof Error && err.message === 'INSUFFICIENT_CREDITS') {
         return reply.status(402).send({
@@ -100,22 +93,15 @@ export const generationRoutes: FastifyPluginAsync = async (fastify) => {
           required: creditsNeeded,
         });
       }
-
-      // If the transaction succeeded but queue.add failed, mark generation as FAILED
-      if (result) {
-        try {
-          await db
-            .update(generationRequests)
-            .set({ status: GENERATION_STATUS.FAILED, updatedAt: new Date() })
-            .where(eq(generationRequests.id, result.id));
-        } catch (cleanupErr) {
-          request.log.error(cleanupErr, 'Failed to mark generation as FAILED after queue error');
-        }
-      }
-
       request.log.error(err, 'Failed to create generation request');
       return reply.status(500).send({ error: 'Internal server error' });
     }
+
+    await videoGenerateQueue.add(
+      'generate',
+      { generationRequestId: result.id },
+      { jobId: result.id },
+    );
 
     return reply.status(201).send(result);
   });

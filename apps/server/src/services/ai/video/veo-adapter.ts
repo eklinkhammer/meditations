@@ -17,13 +17,10 @@ export class VeoVideoAdapter implements VideoProvider {
 
   async generateVideo(prompt: string, durationSeconds: number): Promise<{ jobId: string }> {
     const res = await fetch(
-      `${GEMINI_BASE}/models/${MODEL}:predictLongRunning`,
+      `${GEMINI_BASE}/models/${MODEL}:predictLongRunning?key=${this.apiKey}`,
       {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': this.apiKey,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           instances: [
             {
@@ -37,7 +34,6 @@ export class VeoVideoAdapter implements VideoProvider {
             resolution: '720p',
           },
         }),
-        signal: AbortSignal.timeout(60_000),
       },
     );
 
@@ -52,11 +48,7 @@ export class VeoVideoAdapter implements VideoProvider {
 
   async checkStatus(jobId: string): Promise<VideoJobStatus> {
     const res = await fetch(
-      `${GEMINI_BASE}/${jobId}`,
-      {
-        headers: { 'x-goog-api-key': this.apiKey },
-        signal: AbortSignal.timeout(30_000),
-      },
+      `${GEMINI_BASE}/${jobId}?key=${this.apiKey}`,
     );
 
     if (!res.ok) {
@@ -97,7 +89,6 @@ export class VeoVideoAdapter implements VideoProvider {
 
     const res = await fetch(status.downloadUri, {
       headers: { 'x-goog-api-key': this.apiKey },
-      signal: AbortSignal.timeout(60_000),
     });
 
     if (!res.ok) {
