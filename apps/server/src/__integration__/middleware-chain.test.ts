@@ -46,6 +46,12 @@ vi.mock('@supabase/supabase-js', () => ({
   }),
 }));
 
+vi.mock('../jobs/queue.js', () => ({
+  videoGenerateQueue: {
+    add: vi.fn().mockResolvedValue({ id: 'job-1' }),
+  },
+}));
+
 vi.mock('../config.js', () => ({
   config: {
     port: 3001, nodeEnv: 'test', logLevel: 'silent',

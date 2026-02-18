@@ -23,6 +23,13 @@ vi.mock('../../db/index.js', () => ({
   creditTransactions: {},
 }));
 
+// Mock queue
+vi.mock('../../jobs/queue.js', () => ({
+  videoGenerateQueue: {
+    add: vi.fn().mockResolvedValue({ id: 'job-1' }),
+  },
+}));
+
 // Configurable user for mocked authenticate
 let mockUser: AuthUser = { ...VALID_USER } as AuthUser;
 

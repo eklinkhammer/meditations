@@ -8,6 +8,7 @@ import {
 } from '@meditations/shared';
 import { authenticate } from '../middleware/auth.js';
 import { db, users, generationRequests, creditTransactions } from '../db/index.js';
+import { videoGenerateQueue } from '../jobs/queue.js';
 
 // Credit costs by duration
 const CREDITS_BY_DURATION: Record<number, number> = {
@@ -96,8 +97,11 @@ export const generationRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(500).send({ error: 'Internal server error' });
     }
 
-    // TODO: Enqueue BullMQ job here
-    // await videoGenerateQueue.add('generate', { generationRequestId: result.id });
+    await videoGenerateQueue.add(
+      'generate',
+      { generationRequestId: result.id },
+      { jobId: result.id },
+    );
 
     return reply.status(201).send(result);
   });

@@ -1,6 +1,8 @@
 import { sql } from './db/index.js';
 import { config } from './config.js';
 import { buildApp } from './app.js';
+import { videoGenerateWorker } from './jobs/video-generate-worker.js';
+import { redisConnection } from './jobs/queue.js';
 
 const app = await buildApp({
   logger: {
@@ -11,8 +13,10 @@ const app = await buildApp({
 // Graceful shutdown
 const shutdown = async () => {
   app.log.info('Shutting down gracefully...');
+  await videoGenerateWorker.close();
   await app.close();
   await sql.end();
+  await redisConnection.quit();
   process.exit(0);
 };
 
