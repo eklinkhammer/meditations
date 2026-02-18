@@ -24,23 +24,19 @@ const {
   };
 });
 
-vi.mock('../db/index.js', () => ({
-  db: {
-    select: (...args: unknown[]) => mockDbSelect(...args),
-    update: (...args: unknown[]) => mockDbUpdate(...args),
-    insert: (...args: unknown[]) => mockDbInsert(...args),
-    transaction: (...args: unknown[]) => mockDbTransaction(...args),
-  },
-  sql: mockSql,
-  users: { id: 'id', email: 'email', displayName: 'displayName', role: 'role', authProvider: 'authProvider', creditsBalance: 'creditsBalance', isPremium: 'isPremium', createdAt: 'createdAt', updatedAt: 'updatedAt' },
-  videos: { id: 'id', userId: 'userId', title: 'title', storageKey: 'storageKey', thumbnailKey: 'thumbnailKey', durationSeconds: 'durationSeconds', visibility: 'visibility', moderationStatus: 'moderationStatus', visualPrompt: 'visualPrompt', tags: 'tags', viewCount: 'viewCount', likeCount: 'likeCount', createdAt: 'createdAt', updatedAt: 'updatedAt' },
-  generationRequests: { id: 'id', userId: 'userId', status: 'status', visualPrompt: 'visualPrompt', scriptType: 'scriptType', scriptContent: 'scriptContent', durationSeconds: 'durationSeconds', ambientSoundId: 'ambientSoundId', musicTrackId: 'musicTrackId', videoProvider: 'videoProvider', voiceProvider: 'voiceProvider', creditsCharged: 'creditsCharged', progress: 'progress', videoId: 'videoId', createdAt: 'createdAt', updatedAt: 'updatedAt' },
-  creditTransactions: { id: 'id', userId: 'userId', amount: 'amount', type: 'type', stripePaymentId: 'stripePaymentId', iapReceiptId: 'iapReceiptId', description: 'description', createdAt: 'createdAt' },
-  ambientSounds: { id: 'id', name: 'name', storageKey: 'storageKey', category: 'category', isLoopable: 'isLoopable' },
-  musicTracks: { id: 'id', name: 'name', storageKey: 'storageKey', mood: 'mood', licenseType: 'licenseType' },
-  scriptTemplates: { id: 'id', title: 'title', category: 'category', scriptText: 'scriptText', durationHint: 'durationHint', createdAt: 'createdAt' },
-  pricingConfig: { id: 'id', key: 'key', value: 'value', updatedAt: 'updatedAt' },
-}));
+vi.mock('../db/index.js', async () => {
+  const { mockTables } = await import('./helpers/setup.js');
+  return {
+    db: {
+      select: (...args: unknown[]) => mockDbSelect(...args),
+      update: (...args: unknown[]) => mockDbUpdate(...args),
+      insert: (...args: unknown[]) => mockDbInsert(...args),
+      transaction: (...args: unknown[]) => mockDbTransaction(...args),
+    },
+    sql: mockSql,
+    ...mockTables,
+  };
+});
 
 vi.mock('@supabase/supabase-js', () => ({
   createClient: () => ({
@@ -54,23 +50,15 @@ vi.mock('../jobs/queue.js', () => ({
   },
 }));
 
-vi.mock('../config.js', () => ({
-  config: {
-    port: 3001, nodeEnv: 'test', logLevel: 'silent',
-    corsOrigins: ['http://localhost:3000'],
-    database: { url: 'postgresql://test:test@localhost:5432/test' },
-    redis: { url: 'redis://localhost:6379' },
-    supabase: { url: 'https://test.supabase.co', anonKey: 'test-anon-key', serviceRoleKey: 'test-key' },
-    s3: { endpoint: 'https://s3.test.com', accessKey: 'test', secretKey: 'test', bucket: 'test', publicUrl: 'https://cdn.test.com' },
-    stripe: { secretKey: 'sk_test_123', webhookSecret: 'whsec_test_123' },
-    ai: {},
-  },
-}));
+vi.mock('../config.js', async () => {
+  const { mockConfig } = await import('./helpers/setup.js');
+  return mockConfig;
+});
 
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../app.js';
 import { VALID_USER, VALID_GENERATION, ZERO_CREDIT_USER } from '../test-helpers/fixtures.js';
-import { chainableSelectMock, mockValidAuth, AUTH_HEADER } from './helpers/setup.js';
+import { chainableSelectMock, mockValidAuth, resetAllMocks, AUTH_HEADER } from './helpers/setup.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -108,12 +96,7 @@ describe('Generation Pipeline Integration', () => {
   let app: FastifyInstance;
 
   beforeEach(async () => {
-    mockGetUser.mockReset();
-    mockDbSelect.mockReset();
-    mockDbUpdate.mockReset();
-    mockDbInsert.mockReset();
-    mockDbTransaction.mockReset();
-    mockSql.mockReset().mockResolvedValue([{ '?column?': 1 }]);
+    resetAllMocks({ mockGetUser, mockDbSelect, mockDbUpdate, mockDbInsert, mockDbTransaction, mockSql });
     mockQueueAdd.mockReset().mockResolvedValue({ id: 'job-1' });
     app = await buildApp({ logger: false });
   });
@@ -479,5 +462,26 @@ describe('Generation Pipeline Integration', () => {
     expect(res.statusCode).toBe(201);
     expect(res.json().creditsCharged).toBe(credits);
     expect(mockQueueAdd).toHaveBeenCalledOnce();
+  });
+
+  // -------------------------------------------------------------------------
+  // Invalid duration rejected by Zod schema
+  // -------------------------------------------------------------------------
+  it('rejects invalid durationSeconds with 400', async () => {
+    mockValidAuth(mockGetUser, mockDbSelect, VALID_USER);
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/generations',
+      headers: AUTH_HEADER,
+      payload: {
+        visualPrompt: 'A peaceful scene',
+        scriptType: 'ai_generated',
+        durationSeconds: 90,
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(mockQueueAdd).not.toHaveBeenCalled();
   });
 });

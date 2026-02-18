@@ -37,17 +37,20 @@ const mockDbSelect = vi.fn();
 const mockDbUpdate = vi.fn();
 const mockDbInsert = vi.fn();
 
-vi.mock('../db/index.js', () => ({
-  db: {
-    select: (...args: unknown[]) => mockDbSelect(...args),
-    update: (...args: unknown[]) => mockDbUpdate(...args),
-    insert: (...args: unknown[]) => mockDbInsert(...args),
-  },
-  generationRequests: { id: 'id', userId: 'userId', status: 'status', progress: 'progress', scriptContent: 'scriptContent', videoId: 'videoId', updatedAt: 'updatedAt' },
-  videos: { id: 'id', userId: 'userId', title: 'title', storageKey: 'storageKey', thumbnailKey: 'thumbnailKey', durationSeconds: 'durationSeconds', visibility: 'visibility', moderationStatus: 'moderationStatus', visualPrompt: 'visualPrompt' },
-  ambientSounds: { id: 'id', storageKey: 'storageKey' },
-  musicTracks: { id: 'id', storageKey: 'storageKey' },
-}));
+vi.mock('../db/index.js', async () => {
+  const { mockTables } = await import('./helpers/setup.js');
+  return {
+    db: {
+      select: (...args: unknown[]) => mockDbSelect(...args),
+      update: (...args: unknown[]) => mockDbUpdate(...args),
+      insert: (...args: unknown[]) => mockDbInsert(...args),
+    },
+    generationRequests: mockTables.generationRequests,
+    videos: mockTables.videos,
+    ambientSounds: mockTables.ambientSounds,
+    musicTracks: mockTables.musicTracks,
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Mock AI providers
@@ -193,22 +196,19 @@ function setupFullPipeline(genReq = createGenRequest()) {
 }
 
 // ---------------------------------------------------------------------------
-// Import the worker module — this triggers Worker constructor mock
-// ---------------------------------------------------------------------------
-beforeEach(async () => {
-  vi.clearAllMocks();
-  capturedProcessor = null;
-  capturedFailHandler = null;
-
-  // Dynamic import to trigger Worker constructor each time
-  vi.resetModules();
-  await import('../jobs/video-generate-worker.js');
-});
-
-// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 describe('Worker Pipeline Integration', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    capturedProcessor = null;
+    capturedFailHandler = null;
+
+    // Dynamic import to trigger Worker constructor each time
+    vi.resetModules();
+    await import('../jobs/video-generate-worker.js');
+  });
+
   it('registers a processor and fail handler with the Worker', async () => {
     expect(capturedProcessor).toBeTypeOf('function');
     expect(capturedFailHandler).toBeTypeOf('function');
