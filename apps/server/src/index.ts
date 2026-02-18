@@ -10,9 +10,14 @@ const app = await buildApp({
   },
 });
 
+videoGenerateWorker.on('error', (err: Error) => {
+  app.log.error(err, 'Worker error');
+});
+
 // Graceful shutdown
 const shutdown = async () => {
   app.log.info('Shutting down gracefully...');
+  setTimeout(() => process.exit(1), 30_000).unref();
   await videoGenerateWorker.close();
   await app.close();
   await sql.end();

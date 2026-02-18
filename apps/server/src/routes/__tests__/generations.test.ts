@@ -6,10 +6,12 @@ import type { AuthUser } from '../../middleware/auth.js';
 // Mock db
 const mockTransaction = vi.fn();
 const mockSelect = vi.fn();
+const mockUpdate = vi.fn();
 vi.mock('../../db/index.js', () => ({
   db: {
     select: (...args: unknown[]) => mockSelect(...args),
     transaction: (...args: unknown[]) => mockTransaction(...args),
+    update: (...args: unknown[]) => mockUpdate(...args),
   },
   users: { id: 'id', creditsBalance: 'creditsBalance', updatedAt: 'updatedAt' },
   generationRequests: {
@@ -40,6 +42,7 @@ vi.mock('../../middleware/auth.js', () => ({
 }));
 
 import { generationRoutes } from '../generations.js';
+import { videoGenerateQueue } from '../../jobs/queue.js';
 
 const validBody = {
   visualPrompt: 'A peaceful mountain scene',
@@ -356,6 +359,32 @@ describe('generation routes', () => {
 
       expect(res.statusCode).toBe(500);
       expect(res.json().error).toMatch(/internal server error/i);
+    });
+  });
+
+  describe('queue.add failure', () => {
+    it('returns 500 and marks generation FAILED when queue.add rejects', async () => {
+      mockTransaction.mockImplementation(createSuccessfulTxMock(VALID_GENERATION));
+      vi.mocked(videoGenerateQueue.add).mockRejectedValueOnce(new Error('Redis connection refused'));
+
+      const mockSet = vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue(undefined),
+      });
+      mockUpdate.mockReturnValue({ set: mockSet });
+
+      const app = await buildApp();
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/generations',
+        payload: validBody,
+      });
+
+      expect(res.statusCode).toBe(500);
+      expect(res.json().error).toMatch(/internal server error/i);
+      expect(mockUpdate).toHaveBeenCalledOnce();
+      expect(mockSet).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'failed' }),
+      );
     });
   });
 
